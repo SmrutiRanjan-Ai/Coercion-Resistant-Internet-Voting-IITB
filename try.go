@@ -8,13 +8,6 @@ import (
 	"fmt"
 )
 
-type vote struct {
-	ID                string `json:"id"`
-	VoterID           string
-	BallotIndex       int
-	ConfirmationToken string
-}
-
 var v = vote{"1", "hello", 5, "ok"}
 
 func main1() {
