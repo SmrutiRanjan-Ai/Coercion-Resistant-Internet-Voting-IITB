@@ -94,6 +94,7 @@ func createBallot2(serial string) *ballot2 {
 
 func createPairing(serial string) {
 	var set []string
+
 	var pair = make(map[int]string)
 
 	rand.Seed(time.Now().UnixNano())
@@ -157,6 +158,15 @@ func postBallot1(c *gin.Context) {
 	}
 	serial := b1.Serial
 	tallyballot1[serial] = *b1
+	tallyballots[serial] = true
+	ts := time.Now().Unix()
+	sT := serialTimestamp{serial: serial, timestamp: ts}
+	_, status := tallyID[b1.Pk]
+	if status {
+		tallyID[b1.Pk] = append(tallyID[b1.Pk], sT)
+	} else {
+		tallyID[b1.Pk] = []serialTimestamp{sT}
+	}
 }
 
 func postBallot2(c *gin.Context) {
@@ -174,8 +184,11 @@ func postBallot2(c *gin.Context) {
 	sT := serialTimestamp{serial: serial, timestamp: ts}
 	_, status := tallyID[b2.Pk]
 	if status {
-
+		tallyID[b2.Pk] = append(tallyID[b2.Pk], sT)
+	} else {
+		tallyID[b2.Pk] = []serialTimestamp{sT}
 	}
+
 }
 
 func createCandidates(num int, name string) {
@@ -188,7 +201,12 @@ func createCandidates(num int, name string) {
 }
 
 func verifyBallot() {
-	/*lengthBallotsReceived:=len(tallyballots)
-	lengthBallotsIssued:=len(ballotListTimestamp)*/
+	lengthBallotsReceived := len(tallyballots)
+	lengthBallotsIssued := len(ballotListTimestamp)
+	if lengthBallotsReceived <= lengthBallotsIssued {
+		fmt.Println("Ballots in control")
+	} else {
+		fmt.Println("Fake Ballots introduced")
+	}
 
 }
