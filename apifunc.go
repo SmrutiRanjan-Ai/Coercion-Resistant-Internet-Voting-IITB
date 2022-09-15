@@ -51,7 +51,7 @@ func postVoterID(c *gin.Context) {
 	CheckError(er)*/
 	fmt.Println(voters)
 	voterBallot := createBallot(&user)
-	c.IndentedJSON(http.StatusCreated, *voterBallot)
+	c.IndentedJSON(http.StatusCreated, voterBallot)
 }
 
 func CheckError(err error) {
@@ -64,31 +64,32 @@ func getBallot(voterID string, candidates []candidate) {
 	fmt.Println("hello")
 }
 
-func createBallot(user *voter) *ballot {
+func createBallot(user *voter) ballot {
 	serial := uuidGen()
 	now := time.Now()
-	ballot1Temp := createBallot1(serial)
-	ballot2Temp := createBallot2(serial)
-	var voterBallot *ballot
-	*voterBallot = ballot{Ballot_1: *ballot1Temp, Ballot_2: *ballot2Temp, Serial: serial, Voterid: user.VoterID}
+	createPairing(serial)
+	ballot1Temp := createBallot1(serial, user.VoterID)
+	ballot2Temp := createBallot2(serial, user.VoterID)
+	var voterBallot ballot
+	voterBallot = ballot{Ballot_1: ballot1Temp, Ballot_2: ballot2Temp, Serial: serial, Voterid: user.VoterID}
 	ballotVoterPair[serial] = user.VoterID
 	ballotListTimestamp[serial] = now.Unix()
-	createPairing(serial)
+
 	return voterBallot
 
 }
 
-func createBallot1(serial string) *ballot1 {
-	var b1 *ballot1
+func createBallot1(serial string, pk string) ballot1 {
+	var b1 ballot1
 	c1List, ch1 := createCandidate1(serial)
-	*b1 = ballot1{Candidate1List: c1List, Options1: ch1, Serial: serial, Nonce: 0}
+	b1 = ballot1{Candidate1List: c1List, Options1: ch1, Serial: serial, Nonce: 0, Pk: pk}
 	return b1
 }
 
-func createBallot2(serial string) *ballot2 {
-	var b2 *ballot2
+func createBallot2(serial string, pk string) ballot2 {
+	var b2 ballot2
 	c2List, ch2 := createCandidate2(serial)
-	*b2 = ballot2{Candidate2List: c2List, Options: ch2, Serial: serial}
+	b2 = ballot2{Candidate2List: c2List, Options: ch2, Serial: serial, Pk: pk}
 	return b2
 }
 
@@ -128,7 +129,7 @@ func createCandidate1(serial string) ([]candidate1, []choice1) {
 	cPair := cPairingList[serial]
 	idx := 1
 	for key, val := range candidates {
-		c1List = append(c1List, candidate1{option: cPair[key], candidateName: val})
+		c1List = append(c1List, candidate1{Option: cPair[key], CandidateSerial: key, CandidateName: val})
 		ch1 = append(ch1, choice1{Index: idx, Choice: false})
 		idx++
 	}
@@ -140,8 +141,8 @@ func createCandidate2(serial string) ([]candidate2, []choice2) {
 	var ch2 []choice2
 	pair := pairingList[serial]
 	idx := 1
-	for key, _ := range candidates {
-		c2List = append(c2List, candidate2{candidateSerial: key})
+	for key, val := range candidates {
+		c2List = append(c2List, candidate2{CandidateSerial: key, CandidateName: val})
 		ch2 = append(ch2, choice2{Index: idx, Option: pair[idx], Choice: false})
 		idx++
 	}
@@ -167,6 +168,7 @@ func postBallot1(c *gin.Context) {
 	} else {
 		tallyID[b1.Pk] = []serialTimestamp{sT}
 	}
+
 }
 
 func postBallot2(c *gin.Context) {
@@ -196,6 +198,8 @@ func createCandidates(num int, name string) {
 		concatenated := fmt.Sprintf("%s %d", name, i+1)
 		serial := uuidGen()
 		candidates[serial] = concatenated
+		c := candidate{ID: serial, Name: concatenated}
+		candidateList = append(candidateList, c)
 	}
 
 }
@@ -209,4 +213,132 @@ func verifyBallot() {
 		fmt.Println("Fake Ballots introduced")
 	}
 
+}
+
+func calculateVotes(c *gin.Context) {
+	verifyBallot()
+	var choiceIndex int
+	var finalCandidate string
+	for key, value := range tallyballot1 {
+		serial := key
+		_, status := tallyID[value.Pk]
+		if status {
+			_, status := calculatedVotes[key]
+			if status {
+				continue
+			} else {
+				calculatedVotes[key] = true
+				for _, val := range value.Options1 {
+					if val.Choice == true {
+						choiceIndex = val.Index
+						break
+					}
+				}
+				stringChoice := pairingList[serial][choiceIndex]
+
+				for _, candidate := range value.Candidate1List {
+					if stringChoice == candidate.Option {
+						finalCandidate = candidate.CandidateSerial
+					}
+				}
+				_, status := candidateVotes[finalCandidate]
+				if status {
+					candidateVotes[finalCandidate]++
+				} else {
+					candidateVotes[finalCandidate] = 1
+				}
+
+			}
+		}
+	}
+	for key, value := range tallyballot2 {
+		_, status := tallyID[value.Pk]
+		if status {
+			_, status := calculatedVotes[key]
+			if status {
+				continue
+			} else {
+				for _, val := range value.Options {
+					if val.Choice {
+						pair := cPairingList[key]
+						for cand, opt := range pair {
+							if opt == val.Option {
+								finalCandidate = cand
+								break
+							}
+						}
+					}
+					break
+				}
+				_, status := candidateVotes[finalCandidate]
+				if status {
+					candidateVotes[finalCandidate]++
+				} else {
+					candidateVotes[finalCandidate] = 1
+				}
+
+			}
+		}
+
+	}
+	var results []candidateVotesResults
+	var result candidateVotesResults
+	for i, j := range candidateVotes {
+		result.CandidateSerial = i
+		result.CandidateName = candidates[i]
+		result.CandidateCount = j
+		fmt.Println(i, candidates[i], j)
+		results = append(results, result)
+	}
+	c.IndentedJSON(http.StatusOK, results)
+
+}
+
+func postHedgehog(c *gin.Context) {
+	var hedgehog *hedgehog
+	if err := c.BindJSON(&hedgehog); err != nil {
+		return
+	}
+	hedgehogNonceList[hedgehog.VoterPk] = *hedgehog
+	c.IndentedJSON(http.StatusOK, hedgehog)
+}
+
+func postSecretCode(c *gin.Context) {
+	var nonce *secretCode
+	if err := c.BindJSON(&nonce); err != nil {
+		return
+	}
+	nonceList[nonce.Nonce] = true
+	c.IndentedJSON(http.StatusOK, nonce)
+}
+
+func querySecretCode(c *gin.Context) {
+	var nonce *secretCode
+	if err := c.BindJSON(&nonce); err != nil {
+		return
+	}
+	_, status := nonceList[nonce.Nonce]
+	if status {
+		c.IndentedJSON(http.StatusOK, true)
+	} else {
+		c.IndentedJSON(http.StatusOK, false)
+	}
+}
+
+func postNullVote(c *gin.Context) {
+	var h *hedgehog
+	if err := c.BindJSON(&h); err != nil {
+		return
+	}
+	_, status := hedgehogNonceList[h.VoterPk]
+	if status {
+		delete(tallyID, h.VoterPk)
+		c.IndentedJSON(http.StatusOK, *h)
+	} else {
+		c.IndentedJSON(http.StatusOK, false)
+	}
+}
+
+func getSecretCodes(c *gin.Context) {
+	c.IndentedJSON(http.StatusOK, nonceList)
 }

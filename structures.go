@@ -34,12 +34,14 @@ type ballot struct {
 	Voterid  string  `json:"voterid"`
 }
 type candidate1 struct {
-	option        string `json:"candidate_serial"`
-	candidateName string `json:"candidate_serial"`
+	Option          string `json:"candidate_option"`
+	CandidateSerial string `json:"candidate_serial"`
+	CandidateName   string `json:"candidate_name"`
 }
 
 type candidate2 struct {
-	candidateSerial string `json:"candidate_serial"`
+	CandidateSerial string `json:"candidate_serial"`
+	CandidateName   string `json:"candidate_name"`
 }
 
 type choice1 struct {
@@ -92,4 +94,25 @@ type serialTimestamp struct {
 	timestamp int64
 }
 
+var candidateVotes = make(map[string]int)
 var tallyID = make(map[string][]serialTimestamp)
+var calculatedVotes = make(map[string]bool)
+var candidateList []candidate
+
+type candidateVotesResults struct {
+	CandidateSerial string `json:"candidate_serial"`
+	CandidateName   string `json:"candidate_name"`
+	CandidateCount  int    `json:"candidate_count"`
+}
+
+type hedgehog struct {
+	VoterPk    string `json:"voter_pk"`
+	HedgehogPk string `json:"hedgehog_pk"`
+	Nonce      string `json:"hedgehog_nonce"`
+}
+type secretCode struct {
+	Nonce string `json:"nonce"`
+}
+
+var hedgehogNonceList = make(map[string]hedgehog)
+var nonceList = make(map[string]bool)

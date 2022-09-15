@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-var v = vote{"1", "hello", 5, "ok"}
+//var v = vote{"1", "hello", 5, "ok"}
 
 func main1() {
 	/*data := []byte("hellojkkoyutyutyut")
